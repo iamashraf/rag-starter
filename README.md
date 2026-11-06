@@ -46,10 +46,13 @@ Ask from the command line:
 ragkit ask "What are the on-call severity levels?" --user alice --groups engineering --no-llm
 ```
 
-Or start the HTTP API:
+Or start the HTTP API and call it:
 
-HTTP: `RAGKIT_INSECURE_HEADER_AUTH=1 uvicorn ragkit.api:app --reload`, then
-`curl -XPOST localhost:8000/ask -H 'x-user: alice' -H 'x-groups: engineering' -H 'content-type: application/json' -d '{"question":"How do I rotate payments secrets?"}'`
+```bash
+RAGKIT_INSECURE_HEADER_AUTH=1 uvicorn ragkit.api:app --reload
+curl -XPOST localhost:8000/ask -H 'x-user: alice' -H 'x-groups: engineering' -H 'content-type: application/json' -d '{"question":"How do I rotate payments secrets?"}'
+```
+
 The API trusts the `x-user` and `x-groups` headers, so it refuses to start without that flag. Replace
 `get_principal` with JWT validation before anyone else can reach it.
 
