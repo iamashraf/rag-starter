@@ -13,21 +13,19 @@ decides the architecture. "Answer HR policy questions for 3,000 employees from C
 limited by department" tells you the sources, the ACL model, the freshness need and the
 eval set. "Which vector DB?" tells you nothing.
 
-Most enterprise failures are scoping failures, not model failures.
-
 **In this repo:** nothing to configure. Write your one-paragraph use case at the top of your
 fork's README before you change any code.
 
 ---
 
-## 2. Hybrid retrieval (BM25 + dense) is the baseline, not an upgrade
+## 2. Hybrid retrieval (BM25 + dense) is the baseline
 
 Internal queries are full of exact tokens: ticket ids, service names, error codes, acronyms,
 policy numbers. Embeddings blur those. BM25 matches them exactly but misses paraphrase.
 Most real queries need both.
 
-- Teams report large jumps from adding BM25 next to vectors (one write-up: about 60% to 85%
-  accuracy on a 50-question set). Public benchmarks show gains anywhere from a couple of
+- One write-up reports accuracy rising from about 60% to 85% on a 50-question set after adding
+  BM25 next to vectors. Public benchmarks show gains anywhere from a couple of
   percent to 20%+ depending on the corpus. Measure on yours.
 - Reciprocal Rank Fusion (RRF) is now the built-in fusion in Elastic, OpenSearch, Weaviate,
   Qdrant and Azure AI Search. It uses rank positions only, so no score normalization.
@@ -45,8 +43,8 @@ Bi-encoder embeddings compress a chunk into a single vector. A cross-encoder rer
 query and chunk together and is much more precise, but too slow to run on the whole corpus.
 Standard funnel: ~30 BM25 + ~30 dense candidates, fuse, rerank, keep 5 to 8.
 
-Anthropic's contextual retrieval study is the most cited number: contextual embeddings + BM25
-cut top-20 retrieval failures by 49%, and adding reranking took it to 67%.
+Anthropic's contextual retrieval study reports that contextual embeddings plus BM25 cut top-20
+retrieval failures by 49%, and adding reranking cut them by 67%.
 
 A reranker cannot rescue a chunk that stage one never found, so keep stage one broad.
 
@@ -60,12 +58,14 @@ Good open models: `BAAI/bge-reranker-v2-m3`, `mixedbread-ai/mxbai-rerank-base`. 
 - Recursive / heading-based splitting is a strong, cheap baseline. A 2026 study on long
   structured documents found cluster-based semantic chunking did not beat simpler strategies.
   Other experiments show semantic chunking helping on some content. Measure before you switch.
-- The real problem is lost context: "the limit is 75 USD" means nothing without "Expense policy >
+- The real problem is lost context. "The limit is 75 USD" means nothing without "Expense policy >
   Meal limits". Two fixes:
-  - **Breadcrumbs**: prepend `Doc title > Section > Subsection` to the text you embed. Free.
+  - **Breadcrumbs.** Prepend `Doc title > Section > Subsection` to the text you embed. This
+    costs nothing.
   - **Contextual retrieval**: an LLM writes 1 to 2 sentences placing each chunk in its document,
-    prepended before embedding and BM25 indexing. Better retrieval, but one LLM call per chunk.
-    Late chunking (embed the whole doc, then pool per chunk) is cheaper but tested weaker.
+    prepended before embedding and BM25 indexing. It improves retrieval but costs one LLM call per
+    chunk. Late chunking (embed the whole doc, then pool per chunk) is cheaper but scored lower
+    in tests.
 - Never split inside code blocks or tables. Runbooks are full of both.
 
 **In this repo:** `ingest/chunking.py` (heading-aware, breadcrumb, atomic code/tables),
@@ -79,7 +79,7 @@ This is the item that fails enterprise security reviews. If the pipeline does no
 source system's permissions, a user can retrieve a document they cannot open, and the LLM will
 summarize it confidently with no sign anything went wrong.
 
-What the write-ups agree on:
+Practices to follow:
 
 - **Pre-filter, not post-filter.** Push the ACL into the search query. Filtering the top-k
   afterwards both risks leaks (if anyone forgets the filter) and starves results.
@@ -91,8 +91,8 @@ What the write-ups agree on:
   AWS Verified Permissions) in the loop: pre-filter by coarse tokens, then check each candidate.
 - **Permission changes must propagate.** Someone leaves a team; their access must disappear from
   retrieval too. That is a sync problem (section 6).
-- **Defense in depth**: check at the API layer and the document layer, independently.
-- **Log every authorization decision** (user, doc, rule) for audit.
+- **Defense in depth.** Check at the API layer and the document layer, independently.
+- Log every authorization decision (user, doc, rule) for audit.
 - Resolve the user's identity from your IdP token, never from a request field.
 
 **In this repo:** `models.Principal.acl_tokens`, `store._acl_clause` (pre-filter in both BM25
@@ -100,19 +100,19 @@ and dense SQL), re-check in `retrieval.py`, `audit.py`, and the `acl_leaks` gate
 
 ---
 
-## 6. Freshness and deletes: the index is a cache, build the invalidation
+## 6. Freshness and deletes
 
-Most teams build inserts and leave deletes as a TODO. Then a retired policy keeps answering
+Teams often build inserts and leave deletes as a TODO. Then a retired policy keeps answering
 questions for months ("ghost chunks").
 
-- Keep a **content-hash ledger** per document. Unchanged hash: skip (no embedding cost). Changed:
+- Keep a content-hash ledger per document. Unchanged hash: skip (no embedding cost). Changed:
   replace all chunks for that doc atomically. Missing from source: delete.
-- **Tombstone first**, then delete chunks, so a half-finished delete never serves stale content.
+- Tombstone first, then delete chunks, so a half-finished delete never serves stale content.
   Also check document status at read time, so if ingestion breaks for a weekend you degrade to
   "missing" rather than "wrong".
 - Use stable source ids (page id, file id), not paths. A rename should be an update, not
   a delete + add.
-- Event-driven sync (webhooks, CDC) for freshness, plus a **periodic full reconcile** because
+- Event-driven sync (webhooks, CDC) for freshness, plus a periodic full reconcile because
   event streams miss things.
 - Audit it: pick 50 docs deleted last week and check none of their chunks are still retrievable.
 
@@ -159,12 +159,12 @@ the planted attack in `sample_docs/wiki/team-offsite-notes.md`.
 
 ---
 
-## 9. Agentic RAG: use it where it pays, route to it
+## 9. Agentic RAG: route hard questions to it
 
 Agentic RAG (the model plans queries, retrieves several times, judges results, retries) handles
-multi-hop and comparison questions much better. It also costs 5 to 50x more and takes seconds
-to tens of seconds. The pattern that keeps showing up in production: **classic RAG by default,
-a router sends complex questions to the agentic path.** A 2026 comparison found agentic RAG
+multi-hop and comparison questions better. It also costs 5 to 50x more and takes seconds
+to tens of seconds. The pattern that keeps showing up in production is classic RAG by default,
+with a router that sends complex questions to the agentic path. A 2026 comparison found agentic RAG
 better at query rewriting, while a well-built fixed pipeline stayed more reliable at reranking
 in well-defined domains.
 
@@ -185,7 +185,7 @@ as a tool.
   recall. Useful as trend lines, but LLM-judge scores can be unreliable (one 2026 paper found
   RAGAS faithfulness noisy on mid-range hardware). Spot-check by hand.
 - **Security metrics**: ACL leak count must be zero. Gate CI on it.
-- Build the golden set from **real employee questions** (search logs, Slack, tickets), including
+- Build the golden set from real employee questions (search logs, Slack, tickets), including
   questions that should be refused and questions asked by users without access.
 
 **In this repo:** `eval/run_eval.py`, `eval/golden.jsonl` (includes ACL-negative cases).
