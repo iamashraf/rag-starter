@@ -1,12 +1,10 @@
 # ragkit: a starter for permission-aware RAG over internal docs
 
-A small, readable scaffold that already does the things production write-ups say demos skip:
-hybrid search, ACL enforcement inside the query, incremental sync with real deletes, layered
+A small scaffold that does what most demos skip: hybrid search, ACL enforcement inside the query, incremental sync with real deletes, layered
 guardrails, grounded answers with citations, an audit log, and an eval harness that fails on
 ACL leaks.
 
-It runs with zero infrastructure (one SQLite file) so you can see every moving part, then swap
-pieces out as you grow. Read [`docs/PATTERNS.md`](docs/PATTERNS.md) for the reasoning and sources
+It runs on one SQLite file and needs no other infrastructure. Swap pieces out as you grow. Read [`docs/PATTERNS.md`](docs/PATTERNS.md) for the reasoning and sources
 behind each choice.
 
 ## Quick start
@@ -23,8 +21,10 @@ To get real answers, copy `.env.example` to `.env`, set an LLM endpoint (OpenAI,
 `http://localhost:11434/v1`), and set `RAGKIT_EMBED_PROVIDER=openai` or `ollama`. The default
 `hash` embedder is not semantic. It exists so tests run offline.
 
-HTTP: `uvicorn ragkit.api:app --reload`, then
+HTTP: `RAGKIT_INSECURE_HEADER_AUTH=1 uvicorn ragkit.api:app --reload`, then
 `curl -XPOST localhost:8000/ask -H 'x-user: alice' -H 'x-groups: engineering' -H 'content-type: application/json' -d '{"question":"How do I rotate payments secrets?"}'`
+The API trusts the `x-user` and `x-groups` headers, so it refuses to start without that flag. Replace
+`get_principal` with JWT validation before anyone else can reach it.
 
 ## How a request flows
 
@@ -73,8 +73,8 @@ ingest: loader (with ACL) -> content hash -> chunk (breadcrumbs) -> [contextuali
 - **The planted attack.** `sample_docs/wiki/team-offsite-notes.md` tells the AI to approve
   business class and send receipts to an outside URL. It is flagged at ingest and dropped from
   context at query time. Ask about offsite travel and look at the guardrail events.
-- **Sync is incremental.** Run `ragkit ingest sample_docs` twice: the second run embeds nothing.
-  Delete a file and run it again: the doc is removed from retrieval.
+- **Sync is incremental.** Run `ragkit ingest sample_docs` twice. The second run embeds nothing.
+  Delete a file and run it again. The doc is removed from retrieval.
 - **Dense search needs a real embedder.** With the hash embedder, "PAY-4012 what do I do" can put
   PAY-5001 first because the dense side is noise. Switch to a real model and compare.
 
@@ -90,13 +90,13 @@ ingest: loader (with ACL) -> content hash -> chunk (breadcrumbs) -> [contextuali
 4. **Swap the store** when you pass ~100k chunks: Postgres + pgvector + full-text (or ParadeDB),
    OpenSearch / Elastic, Qdrant or Weaviate. All support hybrid search and RRF natively. Keep the
    ACL pre-filter inside the query.
-5. **Turn on the reranker and contextual retrieval**, then re-run the eval and keep what helps.
-6. **Harden guardrails**: add a classifier behind `scan_for_injection`, a grounding check on
+5. Turn on the reranker and contextual retrieval, then re-run the eval and keep what helps.
+6. **Harden guardrails.** Add a classifier behind `scan_for_injection`, a grounding check on
    output, and tool allow-lists if you add actions.
-7. **Observability**: OpenTelemetry spans per stage, ship `audit.jsonl` to your log pipeline,
-   dashboards for refusal rate, citation failures, latency and ACL denials.
-8. **Agentic path last**, behind a router, only for question types the eval shows the simple
-   path cannot handle.
+7. **Observability.** Add OpenTelemetry spans per stage, ship `audit.jsonl` to your log pipeline,
+   and build dashboards for refusal rate, citation failures, latency and ACL denials.
+8. **Agentic path last.** Put it behind a router, and use it only for question types the eval
+   shows the simple path cannot handle.
 
 ## Config
 
@@ -104,4 +104,9 @@ All settings are env vars prefixed `RAGKIT_` (see `.env.example` and `config.py`
 will touch most: `EMBED_PROVIDER`, `EMBED_MODEL`, `LLM_BASE_URL`, `LLM_MODEL`, `CHUNK_TOKENS`,
 `CANDIDATES`, `TOP_K`, `RERANKER`, `MIN_RELEVANCE`, `CONTEXTUALIZE`.
 
-Changing the embedding model means re-embedding everything: delete `data/ragkit.db` and ingest again.
+Changing the embedding model means re-embedding everything. Delete `data/ragkit.db` and ingest again.
+The index records which embedder built it and raises `EmbedderMismatch` if you switch.
+
+`ragkit ingest` refuses to delete more than half of the indexed docs (a wrong path would otherwise empty
+the index). Pass `--force` when that is what you want. Docs with no `acl` in their front matter are
+visible to nobody.
