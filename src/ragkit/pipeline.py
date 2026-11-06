@@ -15,6 +15,8 @@ from __future__ import annotations
 import time
 import uuid
 
+import httpx
+
 from ragkit import guardrails as g
 from ragkit.audit import AuditLog
 from ragkit.config import Settings
@@ -45,11 +47,22 @@ class RAGPipeline:
 
         queries = [question]
         if self.llm:
-            standalone = condense(history or [], question, self.llm)
-            queries = decompose(standalone, self.llm) if needs_decomposition(standalone) else [standalone]
+            try:  # rewriting only improves recall, so a model hiccup falls back to the raw question
+                standalone = condense(history or [], question, self.llm)
+                queries = decompose(standalone, self.llm) if needs_decomposition(standalone) else [standalone]
+            except httpx.HTTPError:
+                events.append("rewrite:failed")
 
-        items = self.retriever.retrieve(queries, principal)
-        items, ctx_events = g.screen_context(items)
+        try:
+            return self._answer(question, queries, principal, events, trace_id, t0)
+        except Exception as e:
+            failed = Answer("", [], guardrail_events=[*events, f"error:{type(e).__name__}"], trace_id=trace_id)
+            self.audit.record(principal, question, queries, failed, (time.perf_counter() - t0) * 1000)
+            raise
+
+    def _answer(self, question, queries, principal, events, trace_id, t0) -> Answer:
+        retrieved = self.retriever.retrieve(queries, principal)
+        items, ctx_events = g.screen_context(retrieved)
         events += ctx_events
 
         if not items or (self.s.reranker != "none" and items[0].score < self.s.min_relevance):
@@ -59,6 +72,7 @@ class RAGPipeline:
         else:
             ans = self._generate(queries[0], items, events, trace_id)
 
+        ans.retrieved = retrieved
         self.audit.record(principal, question, queries, ans, (time.perf_counter() - t0) * 1000)
         return ans
 

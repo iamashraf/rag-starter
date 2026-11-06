@@ -61,3 +61,4 @@ class Answer:
     refused: bool = False
     guardrail_events: list[str] = field(default_factory=list)
     trace_id: str = ""
+    retrieved: list[RetrievedChunk] = field(default_factory=list)  # everything retrieved, cited or not

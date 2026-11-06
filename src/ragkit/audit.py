@@ -32,7 +32,7 @@ class AuditLog:
             "retrieved": [
                 {"chunk_id": c.chunk.chunk_id, "doc_id": c.chunk.doc_id, "acl": c.chunk.acl,
                  "score": round(c.score, 5), "signals": c.signals}
-                for c in answer.citations
+                for c in answer.retrieved
             ],
             "refused": answer.refused,
             "guardrail_events": answer.guardrail_events,

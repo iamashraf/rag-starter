@@ -14,6 +14,7 @@ the same function signatures.
 """
 from __future__ import annotations
 
+import html
 import re
 
 from ragkit.models import RetrievedChunk
@@ -32,7 +33,7 @@ _COMPILED = {k: re.compile(v, re.IGNORECASE | re.DOTALL) for k, v in _INJECTION_
 
 _REDACT = {
     "ssn": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
-    "card": re.compile(r"\b(?:\d[ -]?){13,16}\b"),
+    "card": re.compile(r"\b\d(?:[ -]?\d){12,15}\b"),
     "aws_key": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
 }
 
@@ -60,7 +61,8 @@ def check_input(question: str) -> list[str]:
 def screen_context(items: list[RetrievedChunk], drop_flagged: bool = True) -> tuple[list[RetrievedChunk], list[str]]:
     kept, events = [], []
     for it in items:
-        hits = scan_for_injection(it.chunk.text)
+        # heading_path carries the doc title and headings, which also reach the model.
+        hits = scan_for_injection(f"{it.chunk.heading_path}\n{it.chunk.text}")
         if hits:
             events.append(f"context:{it.chunk.doc_id}:{'|'.join(hits)}")
             if drop_flagged:
@@ -69,10 +71,14 @@ def screen_context(items: list[RetrievedChunk], drop_flagged: bool = True) -> tu
     return kept, events
 
 
+_SOURCE_TAG = re.compile(r"<\s*(/?)\s*source\b", re.IGNORECASE)
+
+
 def fence(i: int, it: RetrievedChunk) -> str:
-    # Neutralize anything that could close our fence early.
-    body = it.chunk.text.replace("</source>", "</ source>")
-    return f'<source id="{i}" title="{it.title}" section="{it.chunk.heading_path}">\n{body}\n</source>'
+    # Neutralize anything that could open or close our fence, in the body and in the attributes.
+    body = _SOURCE_TAG.sub(r"<\1 source", it.chunk.text)
+    title, section = html.escape(it.title), html.escape(it.chunk.heading_path)
+    return f'<source id="{i}" title="{title}" section="{section}">\n{body}\n</source>'
 
 
 # ---------- output ----------
@@ -88,8 +94,9 @@ def check_output(answer: str, n_sources: int) -> tuple[str, list[str]]:
     if not cited and not is_refusal(answer):
         events.append("output:no_citations")
     for name, rx in _REDACT.items():
-        if rx.search(answer):
-            answer = rx.sub(f"[redacted {name}]", answer)
+        redacted = rx.sub(lambda m: f"[redacted {name}]" if name != "card" or _luhn(m.group()) else m.group(), answer)
+        if redacted != answer:
+            answer = redacted
             events.append(f"output:redacted:{name}")
     return answer, events
 
@@ -97,5 +104,14 @@ def check_output(answer: str, n_sources: int) -> tuple[str, list[str]]:
 REFUSAL = "I could not find this in the documents you have access to."
 
 
+def _luhn(number: str) -> bool:
+    digits = [int(c) for c in number if c.isdigit()][::-1]
+    return sum(d if i % 2 == 0 else sum(divmod(d * 2, 10)) for i, d in enumerate(digits)) % 10 == 0
+
+
+def _norm(text: str) -> str:
+    return text.strip().strip("\"'").rstrip(".").lower()
+
+
 def is_refusal(text: str) -> bool:
-    return REFUSAL.lower()[:30] in text.lower()
+    return _norm(text) == _norm(REFUSAL)
