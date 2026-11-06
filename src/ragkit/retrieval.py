@@ -47,7 +47,7 @@ class CrossEncoderReranker(Reranker):
         if not items:
             return items
         scores = self.model.predict([(query, it.chunk.embed_text) for it in items])
-        for it, s in zip(items, scores):
+        for it, s in zip(items, scores, strict=True):
             it.signals["rerank"] = float(s)
             it.score = float(s)
         return sorted(items, key=lambda x: x.score, reverse=True)
@@ -60,6 +60,7 @@ def build_reranker(s: Settings) -> Reranker:
 class HybridRetriever:
     def __init__(self, store: Store, embedder: Embedder, settings: Settings, reranker: Reranker | None = None):
         self.store, self.embedder, self.s = store, embedder, settings
+        store.bind_embedder(embedder.name)
         self.reranker = reranker or Reranker()
 
     def retrieve(self, queries: list[str], principal: Principal) -> list[RetrievedChunk]:

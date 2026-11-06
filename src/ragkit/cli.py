@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 from ragkit.app import build_app
 from ragkit.ingest.loaders import LocalFolderLoader
@@ -21,6 +22,7 @@ def main(argv: list[str] | None = None) -> None:
     pi = sub.add_parser("ingest", help="sync a local folder into the index")
     pi.add_argument("folder")
     pi.add_argument("--no-reconcile", action="store_true", help="do not delete docs missing from the folder")
+    pi.add_argument("--force", action="store_true", help="allow deleting more than half of the indexed docs")
 
     pa = sub.add_parser("ask")
     pa.add_argument("question")
@@ -35,7 +37,8 @@ def main(argv: list[str] | None = None) -> None:
     if args.cmd == "ingest":
         app = build_app()
         report = sync(LocalFolderLoader(args.folder).load(), app.store, app.embedder, app.settings,
-                      source="local", full_reconcile=not args.no_reconcile, llm=app.llm)
+                      source=f"local:{Path(args.folder).resolve()}", full_reconcile=not args.no_reconcile,
+                      llm=app.llm, force=args.force)
         print(report.summary())
         if report.flagged:
             print("flagged for review (possible prompt injection):", ", ".join(report.flagged))

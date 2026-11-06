@@ -19,14 +19,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 
 from ragkit.config import Settings
 from ragkit.ingest.chunking import chunk_document
 from ragkit.llm import Embedder, LLMClient
 from ragkit.models import SourceDocument
 from ragkit.store import Store
+
+
+class SyncError(RuntimeError):
+    pass
 
 
 @dataclass
@@ -56,9 +60,11 @@ def sync(
     source: str,
     full_reconcile: bool = True,
     llm: LLMClient | None = None,
+    force: bool = False,
 ) -> SyncReport:
     from ragkit.guardrails import scan_for_injection  # local import to avoid a cycle
 
+    store.bind_embedder(embedder.name)
     report = SyncReport()
     seen: set[str] = set()
 
@@ -71,7 +77,7 @@ def sync(
             continue
 
         # Ingest-time guardrail: flag (do not silently drop) docs that look like they carry instructions for the model.
-        hits = scan_for_injection(doc.text)
+        hits = scan_for_injection(f"{doc.title}\n{doc.text}")
         if hits:
             report.flagged.append(doc.doc_id)
             doc.metadata["injection_flags"] = ",".join(hits)
@@ -86,7 +92,13 @@ def sync(
         (report.updated if prev else report.added).append(doc.doc_id)
 
     if full_reconcile:
-        for gone in store.active_doc_ids(source) - seen:
+        active = store.active_doc_ids(source)
+        missing = active - seen
+        # A wrong path or a failed connector yields few docs. Do not let that wipe the index.
+        if missing and len(missing) * 2 > len(active) and not force:
+            raise SyncError(f"would delete {len(missing)} of {len(active)} docs from {source!r}; "
+                            "check the source, or pass force=True / --force")
+        for gone in missing:
             store.delete_document(gone)
             report.deleted.append(gone)
     return report

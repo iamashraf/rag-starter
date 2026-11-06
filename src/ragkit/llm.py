@@ -34,6 +34,7 @@ class LLMClient:
 
 class Embedder:
     dim: int
+    name: str  # identifies the model, so an index built with another one is detected
 
     def embed(self, texts: list[str]) -> np.ndarray:  # (n, dim), L2-normalized
         raise NotImplementedError
@@ -44,6 +45,7 @@ class HashEmbedder(Embedder):
 
     def __init__(self, dim: int = 384):
         self.dim = dim
+        self.name = f"hash:{dim}"
 
     def embed(self, texts: list[str]) -> np.ndarray:
         out = np.zeros((len(texts), self.dim), dtype=np.float32)
@@ -60,6 +62,7 @@ class HashEmbedder(Embedder):
 class OpenAICompatEmbedder(Embedder):
     def __init__(self, base_url: str, api_key: str, model: str, batch: int = 64):
         self.model, self.batch = model, batch
+        self.name = f"{model}@{base_url.rstrip('/')}"
         self._http = httpx.Client(
             base_url=base_url.rstrip("/"), headers={"Authorization": f"Bearer {api_key or 'none'}"}, timeout=120
         )

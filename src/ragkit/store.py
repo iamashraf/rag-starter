@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS chunks (
   embedding BLOB
 );
 CREATE INDEX IF NOT EXISTS idx_chunks_doc ON chunks(doc_id);
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS chunk_acl (
   chunk_id TEXT NOT NULL,
   token TEXT NOT NULL,
@@ -69,13 +70,29 @@ END;
 _FTS_TOKEN = re.compile(r"[\w\-\.]+", re.UNICODE)
 
 
+class EmbedderMismatch(RuntimeError):
+    pass
+
+
 class Store:
     def __init__(self, path: str):
         if path != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
+        if path != ":memory:":
+            self.db.execute("PRAGMA journal_mode=WAL")  # an ingest run does not block readers
         self.db.executescript(SCHEMA)
+
+    def bind_embedder(self, name: str) -> None:
+        """Vectors from different models are not comparable. Record which one built this index."""
+        row = self.db.execute("SELECT value FROM meta WHERE key='embedder'").fetchone()
+        if row and row["value"] != name and self.db.execute("SELECT 1 FROM chunks LIMIT 1").fetchone():
+            raise EmbedderMismatch(f"index was built with {row['value']!r}, now using {name!r}. "
+                                   "Delete the DB file and ingest again.")
+        with self.db:
+            self.db.execute("INSERT INTO meta(key, value) VALUES ('embedder', ?) "
+                            "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (name,))
 
     # ---------- ledger ----------
     def get_hash(self, doc_id: str) -> str | None:
@@ -99,7 +116,7 @@ class Store:
                 (doc.doc_id, doc.source, doc.title, doc.uri, json.dumps(doc.acl), content_hash, doc.updated_at,
                  json.dumps(doc.metadata, default=str)),
             )
-            for c, v in zip(chunks, vectors):
+            for c, v in zip(chunks, vectors, strict=True):
                 self.db.execute(
                     """INSERT INTO chunks(chunk_id, doc_id, ordinal, text, embed_text, heading_path, metadata, embedding)
                        VALUES (?,?,?,?,?,?,?,?)""",

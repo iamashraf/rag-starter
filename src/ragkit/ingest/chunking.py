@@ -84,6 +84,29 @@ def _blocks(body: str) -> list[str]:
     return [b for b in blocks if b.strip()]
 
 
+def _cap(block: str, max_tokens: int) -> list[str]:
+    # shortcut: an oversized code block or table is split on lines and loses its fence, upgrade if you need them whole.
+    if approx_tokens(block) <= max_tokens:
+        return [block]
+    limit = max_tokens * 4
+    pieces, cur = [], ""
+    for line in block.splitlines():
+        while len(line) > limit:  # one giant line: cut it by characters
+            if cur:
+                pieces.append(cur)
+                cur = ""
+            pieces.append(line[:limit])
+            line = line[limit:]
+        if cur and len(cur) + len(line) + 1 > limit:
+            pieces.append(cur)
+            cur = line
+        else:
+            cur = f"{cur}\n{line}" if cur else line
+    if cur:
+        pieces.append(cur)
+    return pieces
+
+
 def chunk_document(doc: SourceDocument, target_tokens: int = 350, overlap_tokens: int = 50) -> list[Chunk]:
     chunks: list[Chunk] = []
     ordinal = 0
@@ -112,7 +135,7 @@ def chunk_document(doc: SourceDocument, target_tokens: int = 350, overlap_tokens
             )
             ordinal += 1
 
-        for block in _blocks(body):
+        for block in (p for b in _blocks(body) for p in _cap(b, target_tokens * 4)):
             bt = approx_tokens(block)
             if window and size + bt > target_tokens:
                 emit()

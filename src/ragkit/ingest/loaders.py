@@ -8,8 +8,9 @@ write one loader per source system and copy the ACL from that system
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, Protocol
+from typing import Protocol
 
 import yaml
 
@@ -38,14 +39,16 @@ class LocalFolderLoader:
         acl: [group:finance, group:hr]
         owner: finance-ops
         ---
-    Docs without an `acl` key get `default_acl` (deny-by-default is safer: set it to []).
+    Docs without an `acl` key get `default_acl`, which is [] (nobody can read them) unless you pass one.
     """
 
     def __init__(self, root: str | Path, default_acl: list[str] | None = None):
         self.root = Path(root)
-        self.default_acl = default_acl if default_acl is not None else ["public"]
+        self.default_acl = default_acl if default_acl is not None else []
 
     def load(self) -> Iterator[SourceDocument]:
+        if not self.root.is_dir():
+            raise FileNotFoundError(f"not a folder: {self.root}")
         for path in sorted(self.root.rglob("*")):
             if path.is_dir() or path.name.startswith("."):
                 continue
