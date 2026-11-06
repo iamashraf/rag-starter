@@ -1,5 +1,5 @@
 """CLI:
-    ragkit ingest ./sample_docs
+    ragkit ingest ./sample_docs [--force]
     ragkit ask "How do I rotate the payments-api secrets?" --user alice --groups engineering
     ragkit stats
 """

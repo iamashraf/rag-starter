@@ -9,6 +9,9 @@ content-hash ledger per document:
     hash unchanged   -> skip (no embedding cost)
     gone from source -> tombstone, then delete chunks
 
+A sync that would delete more than half of a source's docs raises SyncError unless force=True. A wrong
+path or a failed connector otherwise empties the index.
+
 The hash covers text + title + ACL, so a permission change re-indexes the doc's ACL
 rows too. For large corpora you can split that into a cheaper ACL-only update path.
 

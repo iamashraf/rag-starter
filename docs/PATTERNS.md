@@ -66,7 +66,9 @@ Good open models: `BAAI/bge-reranker-v2-m3`, `mixedbread-ai/mxbai-rerank-base`. 
     prepended before embedding and BM25 indexing. It improves retrieval but costs one LLM call per
     chunk. Late chunking (embed the whole doc, then pool per chunk) is cheaper but scored lower
     in tests.
-- Never split inside code blocks or tables. Runbooks are full of both.
+- Never split inside code blocks or tables. Runbooks are full of both. The one exception is a block
+  more than four times the chunk size, which an embedding call would reject. The chunker splits it
+  on lines.
 
 **In this repo:** `ingest/chunking.py` (heading-aware, breadcrumb, atomic code/tables),
 `ingest/contextualize.py` (turn on with `RAGKIT_CONTEXTUALIZE=true`).
@@ -114,9 +116,14 @@ questions for months ("ghost chunks").
   a delete + add.
 - Event-driven sync (webhooks, CDC) for freshness, plus a periodic full reconcile because
   event streams miss things.
+- Refuse a sync that would delete most of the index. A wrong path or a failed connector returns few
+  docs, and the reconcile would delete everything else.
+- Record which embedding model built the index. Vectors from two models do not compare, so a switch
+  needs a fresh index.
 - Audit it: pick 50 docs deleted last week and check none of their chunks are still retrievable.
 
-**In this repo:** `ingest/sync.py`, `store.delete_document`, status join in every search,
+**In this repo:** `ingest/sync.py` (including the mass-delete guard), `store.delete_document`,
+`store.bind_embedder`, status join in every search,
 `tests/test_core.py::test_resync_skips_unchanged_and_deletes_removed`.
 
 ---
@@ -129,7 +136,8 @@ for this; it needs layers:
 
 - **Ingest**: scan documents, flag (and route for review) anything that looks like instructions
   to an AI.
-- **Context**: scan retrieved chunks again at query time; fence them in clear delimiters; tell
+- **Context**: scan retrieved chunks again at query time, titles and headings included. Fence them
+  in clear delimiters and escape any tag that could open or close the fence. Tell
   the model that text inside sources is data, not instructions. A guardrail that only checks
   the user's question is blind to this by construction.
 - **Output**: check citations, check grounding, redact secrets.
@@ -151,6 +159,8 @@ the planted attack in `sample_docs/wiki/team-offsite-notes.md`.
 - Answer only from sources, cite every claim, and give a fixed refusal string when the answer
   is not there. A fixed string lets you count refusals and test for them.
 - Validate citations after generation (do the ids exist?). Uncited claims are a hallucination signal.
+- Count an answer as a refusal only when it equals the refusal string. A longer answer that quotes it
+  is still an answer, and keeps its sources.
 - When sources conflict, say so and prefer the newer one. Put `updated_at` in the source header.
 - Top-k always returns *something*. Without a relevance threshold (reranker score) or an LLM
   that refuses, irrelevant chunks get presented as answers. You can see this in the demo.
@@ -184,11 +194,13 @@ as a tool.
 - **Generation metrics** via RAGAS: faithfulness, answer relevancy, context precision, context
   recall. Useful as trend lines, but LLM-judge scores can be unreliable (one 2026 paper found
   RAGAS faithfulness noisy on mid-range hardware). Spot-check by hand.
-- **Security metrics**: ACL leak count must be zero. Gate CI on it.
+- **Security metrics**: ACL leak count must be zero. Gate CI on it. The workflow in this repo fails on
+  any leak.
 - Build the golden set from real employee questions (search logs, Slack, tickets), including
   questions that should be refused and questions asked by users without access.
 
-**In this repo:** `eval/run_eval.py`, `eval/golden.jsonl` (includes ACL-negative cases).
+**In this repo:** `eval/run_eval.py`, `eval/golden.jsonl` (includes ACL-negative cases),
+`.github/workflows/ci.yml`.
 
 ---
 
@@ -199,7 +211,9 @@ scores, guardrail events, refusal, latency. This gives you an audit trail for se
 debugging trail for quality. In production, emit it as OpenTelemetry spans (retrieve, rerank,
 generate) so you can see where latency and failures come from.
 
-**In this repo:** `audit.py` writes JSONL. Wrap pipeline stages in OTel spans next.
+**In this repo:** `audit.py` writes JSONL. It lists every retrieved chunk, including for refusals and
+for chunks the injection filter dropped, and it records failed requests with an `error:` event. Wrap
+pipeline stages in OTel spans next.
 
 ---
 

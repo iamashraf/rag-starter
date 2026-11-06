@@ -6,7 +6,7 @@ What the research and production write-ups agree on:
   * Chunks lose meaning when cut from their document ("the limit is $50" -- which limit?).
     Fix that cheaply with a breadcrumb (doc title > section > subsection) prepended to
     the text you embed, and optionally with LLM-written context (contextual retrieval).
-  * Never split inside a code block or a table.
+  * Never split inside a code block or a table, unless one block is over four times the token budget.
 
 This chunker: split on markdown headings, then pack paragraphs up to a token budget
 with overlap, keeping fenced code blocks and tables whole.

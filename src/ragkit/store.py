@@ -12,6 +12,8 @@ Two rules this store enforces that most tutorials skip:
   2. A document has a status. Deletion tombstones the doc first so it stops being
      served immediately, then removes chunks. Search joins on status='active', so a
      half-finished delete can never surface a ghost chunk.
+  3. The index records which embedder built it. Vectors from two models do not compare, so a
+     switch raises EmbedderMismatch instead of returning wrong results.
 """
 from __future__ import annotations
 

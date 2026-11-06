@@ -2,7 +2,8 @@
 
 IMPORTANT: the principal must come from a verified identity (OIDC/JWT from your IdP
 via your gateway), never from a field the caller controls. The header-based
-`get_principal` below is a stub for local testing only.
+`get_principal` below is a stub for local testing only. The module refuses to import unless
+RAGKIT_INSECURE_HEADER_AUTH=1 is set.
 """
 from __future__ import annotations
 

@@ -9,6 +9,8 @@ behind each choice.
 
 ## Quick start
 
+You need Python 3.11 or newer.
+
 ```bash
 pip install -e ".[dev,api]"
 ragkit ingest sample_docs
@@ -55,6 +57,7 @@ ingest: loader (with ACL) -> content hash -> chunk (breadcrumbs) -> [contextuali
 | ACL copied from source, enforced inside the search query | `ingest/loaders.py`, `store._acl_clause` |
 | Second ACL check on fetched rows | `retrieval.py` |
 | Content-hash sync, tombstone then delete | `ingest/sync.py`, `store.delete_document` |
+| Mass-delete guard, index tied to its embedder | `ingest/sync.py`, `store.bind_embedder` |
 | Injection scanning at ingest and query time | `guardrails.py`, `ingest/sync.py` |
 | Answer only from sources, cite, fixed refusal | `pipeline.py` |
 | Citation validation and secret redaction | `guardrails.check_output` |
@@ -74,7 +77,8 @@ ingest: loader (with ACL) -> content hash -> chunk (breadcrumbs) -> [contextuali
   business class and send receipts to an outside URL. It is flagged at ingest and dropped from
   context at query time. Ask about offsite travel and look at the guardrail events.
 - **Sync is incremental.** Run `ragkit ingest sample_docs` twice. The second run embeds nothing.
-  Delete a file and run it again. The doc is removed from retrieval.
+  Delete a file and run it again. The doc is removed from retrieval. If a run would delete more than
+  half of the indexed docs, it stops and asks for `--force`.
 - **Dense search needs a real embedder.** With the hash embedder, "PAY-4012 what do I do" can put
   PAY-5001 first because the dense side is noise. Switch to a real model and compare.
 
@@ -98,15 +102,37 @@ ingest: loader (with ACL) -> content hash -> chunk (breadcrumbs) -> [contextuali
 8. **Agentic path last.** Put it behind a router, and use it only for question types the eval
    shows the simple path cannot handle.
 
-## Config
+## Configuration
 
-All settings are env vars prefixed `RAGKIT_` (see `.env.example` and `config.py`). The ones you
-will touch most: `EMBED_PROVIDER`, `EMBED_MODEL`, `LLM_BASE_URL`, `LLM_MODEL`, `CHUNK_TOKENS`,
-`CANDIDATES`, `TOP_K`, `RERANKER`, `MIN_RELEVANCE`, `CONTEXTUALIZE`.
+Every setting is an environment variable that starts with `RAGKIT_`. Put them in a `.env` file in the folder where you run `ragkit`, or export them in your shell. [`docs/CONFIG.md`](docs/CONFIG.md) lists every variable with its default.
 
-Changing the embedding model means re-embedding everything. Delete `data/ragkit.db` and ingest again.
-The index records which embedder built it and raises `EmbedderMismatch` if you switch.
+### Pick a setup
 
-`ragkit ingest` refuses to delete more than half of the indexed docs (a wrong path would otherwise empty
-the index). Pass `--force` when that is what you want. Docs with no `acl` in their front matter are
-visible to nobody.
+The default needs no `.env`. It uses the offline `hash` embedder, so run `ragkit ask --no-llm` to see retrieval alone.
+
+For OpenAI, set your own keys. Keep them in `.env`, which git ignores, and never commit them.
+
+```bash
+RAGKIT_LLM_API_KEY=
+RAGKIT_EMBED_PROVIDER=openai
+RAGKIT_EMBED_API_KEY=
+```
+
+For Ollama, set:
+
+```bash
+RAGKIT_LLM_BASE_URL=http://localhost:11434/v1
+RAGKIT_LLM_API_KEY=ollama
+RAGKIT_LLM_MODEL=llama3.1
+RAGKIT_EMBED_PROVIDER=ollama
+RAGKIT_EMBED_MODEL=nomic-embed-text
+```
+
+The LLM turns on when `RAGKIT_LLM_API_KEY` is not empty. Ollama ignores the key, but it must be set.
+
+### Before you change a setting
+
+- A new embedding model needs a new index. `ragkit` raises `EmbedderMismatch` if you switch. Delete `data/ragkit.db` and run `ragkit ingest` again.
+- `ragkit ingest` refuses to delete more than half of the indexed docs, because a wrong path would empty the index. Pass `--force` when you mean it.
+- A doc with no `acl` in its front matter is visible to nobody.
+- `uvicorn ragkit.api:app` needs `RAGKIT_INSECURE_HEADER_AUTH=1` until you replace `get_principal` with JWT validation.
