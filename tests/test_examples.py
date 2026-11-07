@@ -143,3 +143,10 @@ def test_hybrid_paraphrase_rejects_non_ollama_embedder():
     spec.loader.exec_module(module)
     with pytest.raises(Unavailable):
         module.main("hash")
+
+
+def test_hybrid_paraphrase_discloses_hand_built_best_case():
+    spec = importlib.util.spec_from_file_location("demo_para2", EXAMPLES / "hybrid_paraphrase" / "run.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert "not a benchmark" in module.DISCLOSURE and "written by us" in module.DISCLOSURE

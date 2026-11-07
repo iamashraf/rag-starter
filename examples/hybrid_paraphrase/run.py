@@ -5,6 +5,7 @@ Each question is a short phrase of content words that share no stemmed term with
 rank it in its top 3. The dense embedder must rank it first, and the fused result must contain it.
 ragkit sends no query/document prefixes to nomic-embed-text. Results are measured for this embedder and
 this corpus only; they are not a general claim about dense retrieval.
+See DISCLOSURE below: the corpus is hand-built, so this is a best case, not a benchmark.
 """
 import json
 import sys
@@ -17,6 +18,11 @@ from _common import Unavailable, build, cli, report  # noqa: E402
 from ragkit.models import Principal  # noqa: E402
 
 HERE = Path(__file__).parent
+DISCLOSURE = (
+    "NOTE: the docs and questions were written by us so that no question shares a word with its target doc. "
+    "That makes this a constructed best case for dense search. "
+    "6 questions over 12 docs is not a benchmark; results hold for nomic-embed-text and this corpus only."
+)
 
 
 def rank_of(store, hits, target):
@@ -27,6 +33,7 @@ def rank_of(store, hits, target):
 def main(embedder: str = "ollama") -> bool:
     if embedder != "ollama":
         raise Unavailable("hybrid_paraphrase needs --ollama: the hash embedder cannot match a paraphrase")
+    print(DISCLOSURE)
     ok = True
     principal = Principal("demo", frozenset())
     golden = [json.loads(line) for line in (HERE / "golden.jsonl").read_text().splitlines() if line.strip()]
