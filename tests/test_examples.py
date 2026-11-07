@@ -135,3 +135,11 @@ def test_refusal_prints_part_a_banner(capsys):
     module.main("hash")
     out = capsys.readouterr().out
     assert "PART A" in out and "hash embedder" in out
+
+
+def test_hybrid_paraphrase_rejects_non_ollama_embedder():
+    spec = importlib.util.spec_from_file_location("demo_para", EXAMPLES / "hybrid_paraphrase" / "run.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with pytest.raises(Unavailable):
+        module.main("hash")

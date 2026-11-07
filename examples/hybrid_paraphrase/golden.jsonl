@@ -1,0 +1,6 @@
+{"id": "p1", "question": "money back after journey", "groups": [], "expected_docs": ["expenses-reimbursement"], "reference": "Finance repays approved travel claims in the next payroll run."}
+{"id": "p2", "question": "newborn time off", "groups": [], "expected_docs": ["parental-leave"], "reference": "Birth parents get sixteen weeks of paid absence."}
+{"id": "p3", "question": "forgotten login credentials", "groups": [], "expected_docs": ["password-reset"], "reference": "Use the identity portal to reset your secret with a phone code."}
+{"id": "p4", "question": "damaged computer swap", "groups": [], "expected_docs": ["hardware-faults"], "reference": "IT ships a loaner within two business days after a ticket."}
+{"id": "p5", "question": "suspicious email warning", "groups": [], "expected_docs": ["phishing"], "reference": "Forward phishing attempts to the security mailbox with the flag button."}
+{"id": "p6", "question": "document deletion timeline", "groups": [], "expected_docs": ["data-retention"], "reference": "Customer records are purged after seven years and logs after ninety days."}
