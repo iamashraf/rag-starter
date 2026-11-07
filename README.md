@@ -70,8 +70,17 @@ The API trusts the `x-user` and `x-groups` headers, so it refuses to start witho
 - **Sync is incremental.** Run `ragkit ingest sample_docs` twice. The second run embeds nothing.
   Delete a file and run it again. The doc is removed from retrieval. If a run would delete more than
   half of the indexed docs, it stops and asks for `--force`.
-- **Dense search needs a real embedder.** With the hash embedder, "PAY-4012 what do I do" can put
-  PAY-5001 first because the dense side is noise. Switch to a real model and compare.
+- **Extra words change the ranking.** With the hash embedder, "PAY-4012 what do I do" puts PAY-5001
+  first, because "what do I do" also matches its chunk. Ask for "PAY-4012" alone and the exact id wins.
+  See [`examples/`](examples/README.md) for demos of this and the other patterns.
+
+### Examples
+
+[`examples/`](examples/README.md) has one runnable demo per pattern: hybrid search, permission pre-filtering, deletes and sync, injection, and refusal. Each asserts its own result. Five run offline.
+
+```bash
+python examples/acl_prefilter/run.py
+```
 
 ## Architecture
 
@@ -133,12 +142,14 @@ For Ollama, set:
 ```bash
 RAGKIT_LLM_BASE_URL=http://localhost:11434/v1
 RAGKIT_LLM_API_KEY=ollama
-RAGKIT_LLM_MODEL=llama3.1
+RAGKIT_LLM_MODEL=llama3.1:8b
 RAGKIT_EMBED_PROVIDER=ollama
 RAGKIT_EMBED_MODEL=nomic-embed-text
 ```
 
 The LLM turns on when `RAGKIT_LLM_API_KEY` is not empty. Ollama ignores the key, but it must be set.
+
+The model name must match the pulled tag exactly: `llama3.1` is not `llama3.1:8b`. To run Ollama in a container, use `compose.ollama.yaml`. [`examples/README.md`](examples/README.md#run-with-ollama) has the steps and the volume warnings.
 
 ### Before you change a setting
 

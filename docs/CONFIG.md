@@ -15,7 +15,7 @@
 |---|---|---|
 | `RAGKIT_LLM_BASE_URL` | `https://api.openai.com/v1` | Base URL of any OpenAI-compatible chat endpoint. |
 | `RAGKIT_LLM_API_KEY` | empty | Sent as a bearer token. The LLM stays off while this is empty, and `ragkit` answers in retrieval-only mode. |
-| `RAGKIT_LLM_MODEL` | `gpt-4o-mini` | Model name sent with each request. |
+| `RAGKIT_LLM_MODEL` | `gpt-4o-mini` | Model name sent with each request. For Ollama it must match the pulled tag exactly (`llama3.1` is not `llama3.1:8b`). |
 
 ## Embeddings
 
