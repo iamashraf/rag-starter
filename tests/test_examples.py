@@ -12,7 +12,7 @@ sys.path.insert(0, str(EXAMPLES))
 import _common  # noqa: E402
 from _common import Unavailable  # noqa: E402
 
-OFFLINE: list[str] = ["hybrid_identifier", "acl_prefilter", "injection"]
+OFFLINE: list[str] = ["hybrid_identifier", "acl_prefilter", "injection", "deletes_and_sync"]
 
 
 def test_scripted_llm_returns_fixed_answer():
@@ -114,6 +114,14 @@ def test_acl_prefilter_rejects_non_hash_embedder():
 
 def test_injection_rejects_non_hash_embedder():
     spec = importlib.util.spec_from_file_location("demo_inj", EXAMPLES / "injection" / "run.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with pytest.raises(Unavailable):
+        module.main("ollama")
+
+
+def test_deletes_and_sync_rejects_non_hash_embedder():
+    spec = importlib.util.spec_from_file_location("demo_del", EXAMPLES / "deletes_and_sync" / "run.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     with pytest.raises(Unavailable):
