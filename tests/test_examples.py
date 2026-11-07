@@ -12,7 +12,7 @@ sys.path.insert(0, str(EXAMPLES))
 import _common  # noqa: E402
 from _common import Unavailable  # noqa: E402
 
-OFFLINE: list[str] = ["hybrid_identifier", "acl_prefilter", "injection", "deletes_and_sync"]
+OFFLINE: list[str] = ["hybrid_identifier", "acl_prefilter", "injection", "deletes_and_sync", "refusal"]
 
 
 def test_scripted_llm_returns_fixed_answer():
