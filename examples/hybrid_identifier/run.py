@@ -25,15 +25,17 @@ def dense_note(embedder: str) -> str:
 
 def main(embedder: str = "hash") -> bool:
     ok = True
+    dense_first = []
     principal = Principal("demo", frozenset())
     with tempfile.TemporaryDirectory() as tmp:
         _, store, emb, retriever, _ = build(Path(tmp), DOCS, embedder)
         for inc in TARGETS:
             q, target = f"{inc} what do I do", f"runbook-{inc.lower()}"
             bm25 = store.search_bm25(q, principal.acl_tokens, 10)
-            top_bm25 = store.fetch([bm25[0][0]])[bm25[0][0]]["doc_id"]
+            top_bm25 = store.fetch([bm25[0][0]])[bm25[0][0]]["doc_id"] if bm25 else None
             exp = f"query {q!r}: top BM25 doc is {target}"
-            ok &= report(f"bm25 {inc}", exp, f"top BM25 doc is {top_bm25}", top_bm25 == target)
+            seen = f"top BM25 doc is {top_bm25}" if bm25 else "the BM25 result was empty"
+            ok &= report(f"bm25 {inc}", exp, seen, top_bm25 == target)
             top_fused = retriever.retrieve([q], principal)[0].chunk.doc_id
             exp = f"query {q!r}: top fused doc is {target}"
             ok &= report(f"fused {inc}", exp, f"top fused doc is {top_fused}", top_fused == target)
@@ -41,7 +43,16 @@ def main(embedder: str = "hash") -> bool:
             ids = [store.fetch([c])[c]["doc_id"] for c, _ in dense]
             rank = ids.index(target) + 1 if target in ids else None
             note = dense_note(embedder)
-            print(f"[dense {inc}] INFO ({note}): dense-only rank of {target} = {rank}")
+            print(f"[dense {inc}] INFO ({note}): dense-only rank of {target} = {rank or 'absent'}")
+            dense_first.append(rank == 1)
+        if embedder == "hash":
+            if all(dense_first):
+                print(
+                    "NOTE: on this corpus the dense side also ranked the target first, so this demo shows exact "
+                    "ids being matched lexically, not dense search failing."
+                )
+            else:
+                print(f"NOTE: dense side ranked the target first for {sum(dense_first)} of {len(dense_first)} ids.")
     return ok
 
 

@@ -20,7 +20,7 @@ AUDITOR = Principal("auditor", frozenset({"hr-leadership"}))
 
 
 def post_filter(retriever, query: str, principal: Principal, auditor: Principal) -> list[RetrievedChunk]:
-    """The anti-pattern: retrieve the top-k as someone who sees everything, then drop what `principal` may not read."""
+    """The anti-pattern: retrieve the top-k as a principal that can read every doc in this corpus, then drop what `principal` may not read."""
     hits = retriever.retrieve([query], auditor)
     return [h for h in hits if set(h.chunk.acl) & principal.acl_tokens]
 
@@ -29,7 +29,10 @@ def main(embedder: str = "hash") -> bool:
     if embedder != "hash":
         raise Unavailable("acl_prefilter is an offline demo: run it without --ollama")
     emp = Principal("emp", frozenset())
-    print("NOTE: ragkit has no post-filter path. post_filter() below is this demo's own illustration of the anti-pattern.")
+    print(
+        "NOTE: ragkit has no post-filter path. "
+        "post_filter() below is this demo's own illustration of the anti-pattern."
+    )
     with tempfile.TemporaryDirectory() as tmp:
         settings, _, _, retriever, _ = build(Path(tmp), DOCS)
         settings.final_top_k = 3

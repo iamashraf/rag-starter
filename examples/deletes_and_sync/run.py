@@ -82,18 +82,20 @@ def main(embedder: str = "hash") -> bool:
 
         shutil.copytree(DOCS, work, dirs_exist_ok=True)
         back = resync()
+        ids_before_acl = ids("failover pager rotation", OPS)
         runbook = work / "ops-runbook.md"
         runbook.write_text(runbook.read_text().replace("group:ops", "group:sre"))
         rep = resync()
         q = "failover pager rotation"
         new_ids, old_ids = ids(q, SRE), ids(q, OPS)
+        ops_before = "ops-runbook" in ids_before_acl
         ok &= report(
             "acl change",
             "4 docs restored as added; the acl edit updates only ops-runbook; group:sre reads it, group:ops does not",
             f"restored added={len(back.added)}; updated={rep.updated}; sre sees {new_ids}; "
-            f"old ops group sees {old_ids}",
+            f"old ops group sees {old_ids}; old group read it before the edit: {ops_before}",
             len(back.added) == 4 and rep.updated == ["ops-runbook"]
-            and "ops-runbook" in new_ids and "ops-runbook" not in old_ids,
+            and "ops-runbook" in new_ids and "ops-runbook" not in old_ids and ops_before,
         )
     return ok
 

@@ -20,6 +20,8 @@ from ragkit.pipeline import RAGPipeline  # noqa: E402
 
 DOCS = Path(__file__).parent / "docs"
 QUERY = "travel expense receipts"
+# heading_path is per chunk, so the attack heading governs the whole body here; a doc with a later clean section
+# under another heading keeps that chunk.
 ATTACKS = {"body-attack", "heading-attack"}
 
 
@@ -64,11 +66,16 @@ def main(embedder: str = "hash") -> bool:
         f"guardrail_events = {ans.guardrail_events}",
         dropped == ATTACKS,
     )
+    miss = (
+        "Its instruction is split with zero-width characters and spaces, so the regexes miss it. "
+        if "obfuscated" not in flagged
+        else "Its instruction is split with zero-width characters and spaces, but ingest flagged it anyway. "
+    )
     print(
         f"KNOWN GAP (not asserted): obfuscated flagged at ingest = {'obfuscated' in flagged}; "
-        f"reached the model context = {'obfuscated' in kept_ids}. "
-        "Its instruction is split with zero-width characters and spaces, so the regexes miss it. "
-        "A regex scanner is only a first line; see docs/PATTERNS.md section 7 (add a classifier)."
+        f"would reach the model context = {'obfuscated' in kept_ids}. "
+        + miss
+        + "A regex scanner is only a first line; see docs/PATTERNS.md section 7 (add a classifier)."
     )
     return ok
 

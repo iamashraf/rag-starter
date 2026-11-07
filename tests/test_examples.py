@@ -33,6 +33,9 @@ def test_make_settings_ignores_ambient_env(monkeypatch, tmp_path):
     monkeypatch.setenv("RAGKIT_EMBED_PROVIDER", "openai")
     monkeypatch.setenv("RAGKIT_RERANKER", "cross-encoder")
     monkeypatch.setenv("RAGKIT_MIN_RELEVANCE", "5")
+    monkeypatch.setenv("RAGKIT_CONTEXTUALIZE", "true")
+    monkeypatch.setenv("RAGKIT_DB_PATH", "/elsewhere/ambient.db")
+    monkeypatch.setenv("RAGKIT_AUDIT_PATH", "/elsewhere/ambient.jsonl")
     s = _common.make_settings(tmp_path)
     assert (s.embed_provider, s.reranker, s.min_relevance, s.contextualize) == ("hash", "none", 0.0, False)
     assert Path(s.db_path).parent == tmp_path and Path(s.audit_path).parent == tmp_path
@@ -81,7 +84,9 @@ def test_cli_exit_codes(monkeypatch):
 
 
 def test_every_demo_doc_has_acl():
-    for folder in EXAMPLES.glob("*/docs"):
+    folders = list(EXAMPLES.glob("*/docs"))
+    assert len(folders) >= 6
+    for folder in folders:
         for doc in LocalFolderLoader(folder).load():
             assert doc.acl, f"{doc.id} has no acl"
 
@@ -150,3 +155,13 @@ def test_hybrid_paraphrase_discloses_hand_built_best_case():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert "not a benchmark" in module.DISCLOSURE and "written by us" in module.DISCLOSURE
+
+
+def test_hybrid_identifier_hash_run_prints_lexical_note(capsys):
+    spec = importlib.util.spec_from_file_location("demo_idn", EXAMPLES / "hybrid_identifier" / "run.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.main("hash") is True
+    out = capsys.readouterr().out
+    assert "the hash embedder is not a semantic model" in out
+    assert "matched lexically, not dense search failing" in out

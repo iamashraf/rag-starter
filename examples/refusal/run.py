@@ -13,7 +13,7 @@ from pathlib import Path
 import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from _common import ScriptedLLM, build, cli, make_settings, report, require_ollama  # noqa: E402
+from _common import ScriptedLLM, Unavailable, build, cli, make_settings, report, require_ollama  # noqa: E402
 
 from ragkit.audit import AuditLog  # noqa: E402
 from ragkit.guardrails import REFUSAL  # noqa: E402
@@ -38,6 +38,8 @@ def ollama_version() -> str:
 
 
 def main(embedder: str = "hash") -> bool:
+    if embedder == "ollama":
+        require_ollama([os.environ.get("RAGKIT_LLM_MODEL", "llama3.1:8b")])  # exit 2 before any PASS output
     print("PART A (offline: hash embedder, ScriptedLLM, runs the same with or without --ollama)")
     print("Note: ScriptedLLM is a fake that returns a fixed string. Checks 1, 2 and 4 test how ragkit handles a")
     print("model's output, not how a model behaves.")
@@ -66,8 +68,9 @@ def main(embedder: str = "hash") -> bool:
         ans = ask(None)
         ok &= report(
             "no llm",
-            "retrieval-only mode never refuses: top-k always returns something, so refused=False with citations. "
-            "This is why the project needs a model that refuses or a reranker threshold",
+            "with no reranker threshold, retrieval-only mode returns top-k passages for any question, "
+            "so refused=False with citations. "
+            "This is why the project pairs retrieval with a model that refuses or a reranker threshold",
             f"refused={ans.refused}; citations={len(ans.citations)}",
             ans.refused is False and len(ans.citations) > 0,
         )
@@ -95,7 +98,10 @@ def observe_ollama() -> None:
         store, emb = Store(s.db_path), build_embedder(s)
         sync(LocalFolderLoader(DOCS).load(), store, emb, s, source="local")
         pipe = RAGPipeline(HybridRetriever(store, emb, s), s, build_llm(s), AuditLog(s.audit_path))
-        ans = pipe.ask(QUESTION, USER)
+        try:
+            ans = pipe.ask(QUESTION, USER)
+        except httpx.HTTPError as exc:
+            raise Unavailable(f"Ollama request failed: {exc}") from exc
     print("\nPART B: observation of one real model run, not a guarantee. Another run or model may answer differently.")
     print(f"question: {QUESTION}")
     print(f"refused: {ans.refused}")

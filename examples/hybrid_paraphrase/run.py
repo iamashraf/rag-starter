@@ -3,6 +3,9 @@
 needs: Ollama with the nomic-embed-text model (python examples/hybrid_paraphrase/run.py)
 Each question is a short phrase of content words that share no stemmed term with the target doc, so BM25 cannot
 rank it in its top 3. The dense embedder must rank it first, and the fused result must contain it.
+The third check (fused results contain the target) is a containment check, not a quality claim: fused ranks
+can be lower than the dense rank because BM25 matches common words ("after", "off") in other docs (observed:
+ranks 2 and 5 for two questions).
 ragkit sends no query/document prefixes to nomic-embed-text. Results are measured for this embedder and
 this corpus only; they are not a general claim about dense retrieval.
 See DISCLOSURE below: the corpus is hand-built, so this is a best case, not a benchmark.
@@ -32,7 +35,7 @@ def rank_of(store, hits, target):
 
 def main(embedder: str = "ollama") -> bool:
     if embedder != "ollama":
-        raise Unavailable("hybrid_paraphrase needs --ollama: the hash embedder cannot match a paraphrase")
+        raise Unavailable("hybrid_paraphrase needs --ollama; the hash embedder is not meaningful for paraphrase")
     print(DISCLOSURE)
     ok = True
     principal = Principal("demo", frozenset())
