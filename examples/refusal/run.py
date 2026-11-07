@@ -38,6 +38,7 @@ def ollama_version() -> str:
 
 
 def main(embedder: str = "hash") -> bool:
+    print("PART A (offline: hash embedder, ScriptedLLM, runs the same with or without --ollama)")
     print("Note: ScriptedLLM is a fake that returns a fixed string. Checks 1, 2 and 4 test how ragkit handles a")
     print("model's output, not how a model behaves.")
     with tempfile.TemporaryDirectory() as tmp:

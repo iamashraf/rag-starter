@@ -126,3 +126,12 @@ def test_deletes_and_sync_rejects_non_hash_embedder():
     spec.loader.exec_module(module)
     with pytest.raises(Unavailable):
         module.main("ollama")
+
+
+def test_refusal_prints_part_a_banner(capsys):
+    spec = importlib.util.spec_from_file_location("demo_ref", EXAMPLES / "refusal" / "run.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.main("hash")
+    out = capsys.readouterr().out
+    assert "PART A" in out and "hash embedder" in out
