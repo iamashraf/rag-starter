@@ -65,7 +65,7 @@ def test_require_ollama_missing_model_names_pull_command(monkeypatch):
     monkeypatch.setattr(httpx, "get", lambda *a, **k: _Resp(["llama3.1:8b"]))
     with pytest.raises(Unavailable) as e:
         _common.require_ollama(["llama3.1"])
-    assert "ollama pull llama3.1" in str(e.value) and "llama3.1:8b" in str(e.value)
+    assert "llama3.1:8b" in str(e.value) and "bare name" in str(e.value)
     _common.require_ollama(["llama3.1:8b"])
     monkeypatch.setattr(httpx, "get", lambda *a, **k: _Resp(["nomic-embed-text:latest"]))
     _common.require_ollama(["nomic-embed-text"])
@@ -146,7 +146,7 @@ def test_hybrid_paraphrase_rejects_non_ollama_embedder():
     spec = importlib.util.spec_from_file_location("demo_para", EXAMPLES / "hybrid_paraphrase" / "run.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    with pytest.raises(Unavailable):
+    with pytest.raises(Unavailable, match="needs --ollama"):
         module.main("hash")
 
 

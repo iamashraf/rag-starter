@@ -76,7 +76,7 @@ The API trusts the `x-user` and `x-groups` headers, so it refuses to start witho
 
 ### Examples
 
-[`examples/`](examples/README.md) has one runnable demo per pattern: hybrid search, permission pre-filtering, deletes and sync, injection, and refusal. Each asserts its own result. Five run offline.
+[`examples/`](examples/README.md) has runnable demos for five patterns: hybrid search, permission pre-filtering, deletes and sync, injection, and refusal. Each asserts its own result. Five run offline.
 
 ```bash
 python examples/acl_prefilter/run.py

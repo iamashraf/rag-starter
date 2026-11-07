@@ -35,15 +35,16 @@ Every demo builds its index in a temp directory. It never touches `data/ragkit.d
 Each check prints three lines:
 
 ```
-EXPECTED  what should happen
-OBSERVED  what happened
-PASS      (or FAIL)
+[name] EXPECTED: what should happen
+[name] OBSERVED: what happened
+[name] PASS      (or FAIL)
 ```
 
-Two other labels never change the exit code:
+Other lines never change the exit code:
 
-- **observation**: something the demo reports but does not assert, such as a real model's reply.
-- **known gap**: a case ragkit does not handle. The injection demo prints one.
+- **INFO and NOTE**: context the demo prints but does not assert, such as a dense-only rank.
+- **KNOWN GAP**: a case ragkit does not handle. The injection demo prints one.
+- **PART B**: what a real model replied. It is one observation, not a check.
 
 The `refusal` demo with a scripted LLM tests how ragkit handles a model's output. It does not test a model.
 
@@ -75,9 +76,12 @@ Run on 2026-11-07 with Ollama 0.40.11 and `nomic-embed-text`, against throwaway 
 Both setups had 0 permission leaks. To reproduce it:
 
 ```bash
-ragkit ingest examples/hybrid_paraphrase/docs
-python eval/run_eval.py --golden examples/hybrid_paraphrase/golden.jsonl
+export RAGKIT_DB_PATH=/tmp/paraphrase.db RAGKIT_AUDIT_PATH=/tmp/paraphrase-audit.jsonl   # throwaway index
+ragkit ingest examples/hybrid_paraphrase/docs                                              # hash embedder
+for k in 1 3 5; do python eval/run_eval.py --golden examples/hybrid_paraphrase/golden.jsonl -k $k; done
 ```
+
+For the Ollama row, use a second database and add `RAGKIT_EMBED_PROVIDER=ollama RAGKIT_EMBED_MODEL=nomic-embed-text` to both commands.
 
 Read these numbers with care:
 

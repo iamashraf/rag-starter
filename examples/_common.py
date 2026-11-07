@@ -37,14 +37,18 @@ def require_ollama(model_names: list[str]) -> None:
         r.raise_for_status()
         have = [m["name"] for m in r.json().get("models", [])]
     except (httpx.HTTPError, ValueError) as e:
-        raise Unavailable(f"Ollama is not reachable at {OLLAMA_TAGS} ({e}). Start it with: ollama serve") from e
+        raise Unavailable(
+            f"Ollama is not reachable at {OLLAMA_TAGS} ({e}). "
+            "Start it with: podman compose -f compose.ollama.yaml up -d"
+        ) from e
     for name in model_names:
         want = name if ":" in name else f"{name}:latest"
         if want in have:
             continue
         tagged = [h for h in have if h.split(":")[0] == name.split(":")[0]] if ":" not in name else []
         hint = f" (found {', '.join(tagged)}, but a bare name matches only :latest)" if tagged else ""
-        raise Unavailable(f"Ollama model '{name}' is missing{hint}. Run: ollama pull {name}")
+        fix = f"set the model to the tagged name (for example {tagged[0]})" if tagged else f"run: ollama pull {name}"
+        raise Unavailable(f"Ollama model '{name}' is missing{hint}. To fix, {fix}")
 
 
 def make_settings(tmp: Path, embedder: str = "hash") -> Settings:

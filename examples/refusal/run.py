@@ -39,7 +39,9 @@ def ollama_version() -> str:
 
 def main(embedder: str = "hash") -> bool:
     if embedder == "ollama":
-        require_ollama([os.environ.get("RAGKIT_LLM_MODEL", "llama3.1:8b")])  # exit 2 before any PASS output
+        # exit 2 before any PASS output
+        chat = os.environ.get("RAGKIT_LLM_MODEL", "llama3.1:8b")
+        require_ollama([chat, os.environ.get("RAGKIT_EMBED_MODEL", "nomic-embed-text")])
     print("PART A (offline: hash embedder, ScriptedLLM, runs the same with or without --ollama)")
     print("Note: ScriptedLLM is a fake that returns a fixed string. Checks 1, 2 and 4 test how ragkit handles a")
     print("model's output, not how a model behaves.")
@@ -96,9 +98,9 @@ def observe_ollama() -> None:
         s.llm_model = os.environ.get("RAGKIT_LLM_MODEL", "llama3.1:8b")
         require_ollama([s.llm_model])
         store, emb = Store(s.db_path), build_embedder(s)
-        sync(LocalFolderLoader(DOCS).load(), store, emb, s, source="local")
-        pipe = RAGPipeline(HybridRetriever(store, emb, s), s, build_llm(s), AuditLog(s.audit_path))
         try:
+            sync(LocalFolderLoader(DOCS).load(), store, emb, s, source="local")
+            pipe = RAGPipeline(HybridRetriever(store, emb, s), s, build_llm(s), AuditLog(s.audit_path))
             ans = pipe.ask(QUESTION, USER)
         except httpx.HTTPError as exc:
             raise Unavailable(f"Ollama request failed: {exc}") from exc
