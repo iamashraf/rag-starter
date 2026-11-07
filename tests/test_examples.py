@@ -12,7 +12,7 @@ sys.path.insert(0, str(EXAMPLES))
 import _common  # noqa: E402
 from _common import Unavailable  # noqa: E402
 
-OFFLINE: list[str] = []
+OFFLINE: list[str] = ["hybrid_identifier"]
 
 
 def test_scripted_llm_returns_fixed_answer():
