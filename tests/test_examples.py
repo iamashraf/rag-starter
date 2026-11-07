@@ -12,7 +12,7 @@ sys.path.insert(0, str(EXAMPLES))
 import _common  # noqa: E402
 from _common import Unavailable  # noqa: E402
 
-OFFLINE: list[str] = ["hybrid_identifier"]
+OFFLINE: list[str] = ["hybrid_identifier", "acl_prefilter"]
 
 
 def test_scripted_llm_returns_fixed_answer():
@@ -102,3 +102,11 @@ def test_hybrid_identifier_dense_note_follows_embedder():
     spec.loader.exec_module(module)
     assert "hash" in module.dense_note("hash")
     assert "hash" not in module.dense_note("ollama") and "semantic" not in module.dense_note("ollama")
+
+
+def test_acl_prefilter_rejects_non_hash_embedder():
+    spec = importlib.util.spec_from_file_location("demo_acl", EXAMPLES / "acl_prefilter" / "run.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with pytest.raises(Unavailable):
+        module.main("ollama")
