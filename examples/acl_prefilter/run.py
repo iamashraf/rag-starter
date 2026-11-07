@@ -20,7 +20,8 @@ AUDITOR = Principal("auditor", frozenset({"hr-leadership"}))
 
 
 def post_filter(retriever, query: str, principal: Principal, auditor: Principal) -> list[RetrievedChunk]:
-    """The anti-pattern: retrieve the top-k as a principal that can read every doc in this corpus, then drop what `principal` may not read."""
+    """The anti-pattern: retrieve the top-k as a principal that can read every doc in this corpus,
+    then drop what `principal` may not read."""
     hits = retriever.retrieve([query], auditor)
     return [h for h in hits if set(h.chunk.acl) & principal.acl_tokens]
 
