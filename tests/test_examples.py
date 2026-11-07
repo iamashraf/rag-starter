@@ -94,3 +94,11 @@ def test_offline_demo_passes(name, monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     assert module.main("hash") is True
     assert list(tmp_path.iterdir()) == []
+
+
+def test_hybrid_identifier_dense_note_follows_embedder():
+    spec = importlib.util.spec_from_file_location("demo_note", EXAMPLES / "hybrid_identifier" / "run.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert "hash" in module.dense_note("hash")
+    assert "hash" not in module.dense_note("ollama") and "semantic" not in module.dense_note("ollama")

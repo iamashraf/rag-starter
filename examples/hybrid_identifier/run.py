@@ -17,6 +17,12 @@ DOCS = Path(__file__).parent / "docs"
 TARGETS = ["INC-7731", "INC-7733", "INC-7736"]
 
 
+def dense_note(embedder: str) -> str:
+    if embedder == "hash":
+        return "not asserted; the hash embedder is not a semantic model"
+    return "not asserted; informational, from the Ollama embedder (nomic-embed-text by default)"
+
+
 def main(embedder: str = "hash") -> bool:
     ok = True
     principal = Principal("demo", frozenset())
@@ -34,7 +40,7 @@ def main(embedder: str = "hash") -> bool:
             dense = store.search_dense(emb.embed([q])[0], principal.acl_tokens, 100)
             ids = [store.fetch([c])[c]["doc_id"] for c, _ in dense]
             rank = ids.index(target) + 1 if target in ids else None
-            note = "not asserted; the hash embedder is not a semantic model"
+            note = dense_note(embedder)
             print(f"[dense {inc}] INFO ({note}): dense-only rank of {target} = {rank}")
     return ok
 
