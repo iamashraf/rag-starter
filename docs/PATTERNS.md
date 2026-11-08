@@ -35,6 +35,8 @@ Most real queries need both.
 **In this repo:** `store.py` (FTS5 BM25 + vectors), `retrieval.py` (`rrf`, `HybridRetriever`).
 Try `ragkit ask "PAY-4012" --no-llm` and look at `bm25_rank` in `--json` output.
 
+**Demos:** `examples/hybrid_identifier` (BM25 finds an exact id) and `examples/hybrid_paraphrase` (dense finds a paraphrase, needs Ollama).
+
 ---
 
 ## 3. Retrieve wide, rerank narrow
@@ -100,6 +102,8 @@ Practices to follow:
 **In this repo:** `models.Principal.acl_tokens`, `store._acl_clause` (pre-filter in both BM25
 and dense SQL), re-check in `retrieval.py`, `audit.py`, and the `acl_leaks` gate in `eval/run_eval.py`.
 
+**Demo:** `examples/acl_prefilter` shows a post-filter returning nothing where the in-query filter returns the allowed doc.
+
 ---
 
 ## 6. Freshness and deletes
@@ -125,6 +129,8 @@ questions for months ("ghost chunks").
 **In this repo:** `ingest/sync.py` (including the mass-delete guard), `store.delete_document`,
 `store.bind_embedder`, status join in every search,
 `tests/test_core.py::test_resync_skips_unchanged_and_deletes_removed`.
+
+**Demo:** `examples/deletes_and_sync` runs re-sync, delete, mass-delete guard and ACL change.
 
 ---
 
@@ -152,6 +158,8 @@ Llama Guard, a managed guardrail service, or an LLM judge) behind the same inter
 **In this repo:** `guardrails.py` (input, context, output layers), ingest flagging in `sync.py`,
 the planted attack in `sample_docs/wiki/team-offsite-notes.md`.
 
+**Demo:** `examples/injection` flags two attacks at ingest, drops them at query time, checks that a third cannot break the source fence, and prints the obfuscated one a regex misses.
+
 ---
 
 ## 8. Grounded generation with citations and an explicit refusal
@@ -166,6 +174,8 @@ the planted attack in `sample_docs/wiki/team-offsite-notes.md`.
   that refuses, irrelevant chunks get presented as answers. You can see this in the demo.
 
 **In this repo:** `pipeline.SYSTEM`, `guardrails.check_output`, `RAGKIT_MIN_RELEVANCE`.
+
+**Demo:** `examples/refusal` tests how ragkit handles a refusal, with a scripted model and optionally a real one.
 
 ---
 
